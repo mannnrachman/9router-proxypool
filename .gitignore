@@ -31,6 +31,9 @@ desktop.ini
 # === Docker ===
 # (tidak ignore docker-compose.yml karena commit-safe pakai ${VAR})
 
+# === WARP Data ===
+warp-proxy/data/
+
 # === Runtime ===
 proxy-response.json
 *.sqlite
