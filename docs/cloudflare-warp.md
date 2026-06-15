@@ -70,7 +70,7 @@ When `test-warp.sh` shows `[PASS]`, proceed to **[Connect to 9Router](#connect-t
 |---|---|---|---|
 | `WARP_PROXY_USER` | SOCKS5 auth username | `opencode` | Required — rejects unauthenticated use |
 | `WARP_PROXY_PASS` | SOCKS5 auth password | (random) | Generate: `openssl rand -base64 18 \| tr -d '/+='` |
-| `WARP_INSTANCES` | Number of WARP instances | `5` | Each gets unique Cloudflare IP. RAM ~50-100MB per instance |
+| `WARP_INSTANCES` | Number of WARP instances | `10` | Each registers independently with Cloudflare. RAM ~70-100MB per instance |
 | `WARP_LICENSE_KEY` | WARP+ license (optional) | `xxxx-xxxx-xxxx-xxxx` | Free tier works without it |
 | `WARP_HOST` | Host bind | `127.0.0.1` | Localhost only (secure) |
 | `WARP_PORT` | Host port | `10800` | Container internal port is 1080 |
@@ -88,11 +88,52 @@ Edit `WARP_INSTANCES` in `.env`:
 | Value | RAM | Use case |
 |---|---|---|
 | `1` | ~100MB | No rotation (single IP) |
-| `3` | ~300MB | Light rotation |
-| `5` | ~500MB | **Default** — good balance |
-| `10` | ~1GB | Heavy rotation, high traffic |
+| `3` | ~300MB | Light rotation, low traffic |
+| `5` | ~500MB | Balanced for personal use |
+| `10` | ~700MB-1GB | **Default** — heavy rotation, parallel requests |
+| `15-20` | ~1.5-2GB | Max rotation (diminishing returns on unique IPs) |
 
-After changing: `docker compose down && docker compose up -d`
+**How to add or remove instances:**
+
+```bash
+cd 9router-proxypool/warp-proxy
+
+# 1. Edit .env
+nano .env
+# Change: WARP_INSTANCES=10  (or any number you want)
+
+# 2. Restart container (required - instances spawn at startup)
+docker compose down && docker compose up -d
+
+# 3. Wait ~30s for all instances to register with Cloudflare
+sleep 30
+
+# 4. Verify
+docker exec warp-proxy bash -c "ls /var/lib/cloudflare-warp/ | grep -c instance"
+# Expected output: 10 (or your configured number)
+
+# 5. Test rotation
+./test-warp.sh
+```
+
+> **Important:** You MUST run `docker compose down && docker compose up -d` (not just `restart`) when changing `WARP_INSTANCES`. The instance count is read at container startup; a plain restart reuses the old config.
+
+### Understanding Unique IP Count
+
+Cloudflare WARP free tier shares a limited IP pool across all users. Even with 10 instances, you may see only 3-5 unique IPs because:
+
+- Each instance requests an IP from Cloudflare's pool on registration
+- Cloudflare reuses IPs across instances in the same datacenter
+- The pool is regional (e.g., Singapore datacenter has fewer IPs than US)
+
+**What more instances DO give you:**
+- ✅ Higher throughput (more parallel connections)
+- ✅ Better per-IP load distribution
+- ✅ Faster failover when one instance dies
+
+**What more instances DON'T give you:**
+- ❌ More unique IPs beyond Cloudflare's pool limit
+- ❌ Different geographic regions (all instances use nearest PoP)
 
 ---
 
