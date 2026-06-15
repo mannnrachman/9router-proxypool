@@ -7,7 +7,7 @@ Self-hosted proxy pools for [9Router](https://github.com/decolua/9router) — ro
 | Option | What it does | Best for |
 |---|---|---|
 | **[Cloudflare WARP](./docs/cloudflare-warp.md)** ⭐ | SOCKS5 proxy with **IP rotation** — routes through Cloudflare's network with multiple rotating IPs | Hiding your real server IP + distribute traffic across IPs |
-| **[Squid Proxy](./docs/squid-proxy.md)** | Anonymous HTTP proxy that strips identifying headers (`Via`, `XFF`, etc.) + auth | Anonymity without IP change |
+| **[Squid Proxy](./docs/squid-proxy.md)** | Anonymous HTTP proxy that strips identifying headers (`Via`, `X-Forwarded-For (XFF)`, etc.) + auth | Anonymity without IP change |
 
 > **New here?** Start with [Cloudflare WARP](./docs/cloudflare-warp.md) — it's the recommended option for most users.
 
@@ -77,7 +77,8 @@ opencode.ai
 
 ## Built On
 
-- [ErcinDedeoglu/cloudflare-warp](https://github.com/ErcinDedeoglu/cloudflare-warp) — Cloudflare WARP client in Docker with multi-instance IP rotation
+- [dublok/cloudflare-warp](https://hub.docker.com/r/dublok/cloudflare-warp) — Docker image used by this project for Cloudflare WARP
+- [ErcinDedeoglu/cloudflare-warp](https://github.com/ErcinDedeoglu/cloudflare-warp) — upstream Cloudflare WARP implementation
 - [yegor256/squid-proxy](https://github.com/yegor256/squid-proxy) — anonymous Squid + HTTP Basic auth
 - [decolua/9router](https://github.com/decolua/9router) — the AI gateway this proxy integrates with
 

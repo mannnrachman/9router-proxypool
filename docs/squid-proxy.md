@@ -12,7 +12,7 @@ Self-hosted [Squid](https://www.squid-cache.org/) proxy with hardened anonymity 
 9Router (:20128)
     ↓ routes OpenCode Free → squid-local pool
 Squid Container (Docker, port 3128)
-    ↓ strips Via/XFF/X-Squid-Error headers
+    ↓ strips Via/X-Forwarded-For (XFF)/X-Squid-Error headers
     ↓ requires HTTP Basic Auth
 opencode.ai (sees your server IP, but no proxy signature)
 ```
@@ -34,7 +34,7 @@ cd 9router-proxypool/squid-proxy
 
 # 1. Configure credentials
 cp .env.example .env
-nano .env          # set SQUID_PASSWORD
+nano .env          # set SQUID_USERNAME and SQUID_PASSWORD
 chmod 600 .env
 
 # 2. Start the proxy

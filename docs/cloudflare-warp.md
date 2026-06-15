@@ -71,9 +71,11 @@ When `test-warp.sh` shows `[PASS]`, proceed to **[Connect to 9Router](#connect-t
 | `WARP_PROXY_USER` | SOCKS5 auth username | `opencode` | Required — rejects unauthenticated use |
 | `WARP_PROXY_PASS` | SOCKS5 auth password | (random) | Generate: `openssl rand -base64 18 \| tr -d '/+='` |
 | `WARP_INSTANCES` | Number of WARP instances | `10` | Each registers independently with Cloudflare. RAM ~70-100MB per instance |
-| `WARP_LICENSE_KEY` | WARP+ license (optional) | `xxxx-xxxx-xxxx-xxxx` | Free tier works without it |
-| `WARP_HOST` | Host bind | `127.0.0.1` | Localhost only (secure) |
-| `WARP_PORT` | Host port | `10800` | Container internal port is 1080 |
+| `WARP_LICENSE_KEY` | WARP+ license (optional) | `xxxx-xxxx-xxxx-xxxx` | Passed to the container when set; free tier works without it |
+| `WARP_HOST` | Host bind | `127.0.0.1` | Used by Docker port binding and test scripts |
+| `WARP_PORT` | Host port | `10800` | Used by Docker port binding and test scripts; container internal port stays `1080` |
+
+> `WARP_HOST` and `WARP_PORT` are used by both `docker-compose.yml` and the test scripts.
 
 **Security defaults:**
 - Binds to `127.0.0.1` (localhost only — not exposed to internet)
@@ -147,10 +149,10 @@ Cloudflare WARP free tier shares a limited IP pool across all users. Even with 1
    | Field | Value |
    |---|---|
    | **Name** | `warp-local` |
-   | **Proxy URL** | `socks5://USERNAME:PASSWORD@127.0.0.1:10800` |
+   | **Proxy URL** | `socks5://USERNAME:PASSWORD@WARP_HOST:WARP_PORT` |
    | **Type** | SOCKS5 |
 
-   Replace `USERNAME:PASSWORD` with values from `.env`.
+   Replace `USERNAME:PASSWORD` with values from `.env`. By default, `WARP_HOST=127.0.0.1` and `WARP_PORT=10800`.
 
 3. Save → Test → expect success
 4. **Providers → OpenCode Free** → Proxy Pool dropdown → `warp-local` → Save
@@ -253,7 +255,7 @@ warp-proxy/
 | Fewer unique IPs than instances | Some instances still connecting | Normal during startup; re-check after 1 min |
 | "User was rejected" | Wrong credentials | Re-check `WARP_PROXY_USER`/`PASS` in `.env` |
 | `address already in use` | Port 10800 occupied | Change `WARP_PORT` in `.env` |
-| 9Router test fails | Wrong URL or 9Router can't reach localhost | Verify 9Router binds to `10.0.0.1` and proxy is `127.0.0.1:10800` |
+| 9Router test fails | Wrong URL or 9Router cannot reach the configured proxy host/port | Verify `WARP_HOST`/`WARP_PORT` in `.env` and make sure 9Router can reach them |
 | High RAM usage | Too many instances | Reduce `WARP_INSTANCES` in `.env` |
 
 ---
