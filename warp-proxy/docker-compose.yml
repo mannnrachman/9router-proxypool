@@ -4,13 +4,13 @@ services:
     container_name: warp-proxy
     restart: unless-stopped
     ports:
-      - "127.0.0.1:10800:1080"  # SOCKS5 WARP - localhost only
+      - "${WARP_HOST:-127.0.0.1}:${WARP_PORT:-10800}:1080"  # SOCKS5 WARP
     environment:
       - WARP_INSTANCES=${WARP_INSTANCES:-5}
       - PROXY_USER=${WARP_PROXY_USER}
       - PROXY_PASS=${WARP_PROXY_PASS}
       - PROXY_MAX_CONN=0
       - PROXY_MAX_RPS=0
-      # - WARP_LICENSE_KEY=${WARP_LICENSE_KEY}  # Optional WARP+
+      - WARP_LICENSE_KEY=${WARP_LICENSE_KEY}  # Optional WARP+
     volumes:
       - ./data:/var/lib/cloudflare-warp
