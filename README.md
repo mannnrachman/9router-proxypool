@@ -1,9 +1,9 @@
 # 9Router ProxyPool
 
-Self-hosted [Squid](https://www.squid-cache.org/) proxy pool configuration for [9Router](https://github.com/decolua/9router) — routes OpenCode Free traffic through your own server IP with anonymous headers stripped and auto-recovery.
+Self-hosted [Squid](https://www.squid-cache.org/) proxy pool for [9Router](https://github.com/decolua/9router) — routes OpenCode Free traffic through your own server IP with anonymous headers stripped and auto-recovery.
 
 Built on top of:
-- [yegor256/squid-proxy](https://github.com/yegor256/squid-proxy) — Docker image for anonymous Squid with HTTP Basic auth
+- [yegor256/squid-proxy](https://github.com/yegor256/squid-proxy) — Docker image (anonymous Squid + HTTP Basic auth)
 - [decolua/9router](https://github.com/decolua/9router) — the AI gateway this proxy integrates with
 
 ---
@@ -20,30 +20,28 @@ The authors and contributors assume no liability for misuse.
 
 ---
 
-## Architecture
+## Prerequisites
 
-```
-9Router (localhost:20128)
-    ↓ HTTP POST /v1/chat/completions (model oc/*)
-Provider OpenCode Free → resolve proxy from providerStrategies
-    ↓ Proxy URL: http://${SQUID_USERNAME}:${SQUID_PASSWORD}@${SQUID_HOST}:${SQUID_PORT}
-Squid Container (Docker, yegor256/squid-proxy:latest)
-    ↓ Custom config: anonymous + reply_header stripped
-opencode.ai (sees server IP, no Squid headers leaked)
-```
+Before you start, make sure you have:
+
+- **Docker** + **Docker Compose** installed ([install guide](https://docs.docker.com/get-docker/))
+- **9Router** already running (visit `http://localhost:20128` to verify)
+- **OpenCode Free** provider visible in your 9Router dashboard
+
+That's it. No Squid expertise required — Docker handles everything.
 
 ---
 
-## Quick Start
+## Quick Start (5 minutes)
 
 ```bash
-cd squid-proxy
+# 1. Get the code
+git clone https://github.com/mannnrachman/9router-proxypool.git
+cd 9router-proxypool/squid-proxy
 
-# 1. Copy template and edit credentials
+# 2. Configure credentials
 cp .env.example .env
-nano .env
-
-# 2. Restrict permissions (file contains secrets)
+nano .env            # set your SQUID_PASSWORD
 chmod 600 .env
 
 # 3. Start the proxy
@@ -53,78 +51,65 @@ docker compose up -d
 ./test-connection.sh
 ```
 
-After the proxy is running, follow **[Setup in 9Router Dashboard](#setup-in-9router-dashboard)** below to bind it to OpenCode Free.
+When `test-connection.sh` shows `[PASS]`, proceed to **[Connect to 9Router](#connect-to-9router)** below.
 
 ---
 
-## Setup in 9Router Dashboard
+## Configuration (`.env`)
 
-This section walks through connecting your Squid proxy to 9Router step by step.
+Edit `squid-proxy/.env` to customize. All variables:
 
-### Prerequisites
+| Variable | What it does | Example | Notes |
+|---|---|---|---|
+| `SQUID_USERNAME` | Login username | `opencode` | Pick anything you like |
+| `SQUID_PASSWORD` | Login password | (random) | Generate: `openssl rand -base64 18 \| tr -d '/+='` |
+| `SQUID_HOST` | Bind interface | `127.0.0.1` | `127.0.0.1` = local only (safe), `0.0.0.0` = expose to network (risky!) |
+| `SQUID_PORT` | TCP port | `3128` | Standard Squid port. Change only if conflict |
+| `HEALTH_CHECK_URL` | URL used to test proxy | `https://httpbin.org/ip` | Any HTTPS URL returning 200 |
 
-- 9Router running (default: `http://localhost:20128`)
-- Squid proxy running (from Quick Start above)
-- `./test-connection.sh` returns `[PASS]`
+**Beginner tip:** Keep the defaults — they work for 99% of setups. Just change `SQUID_PASSWORD`.
+
+---
+
+## Connect to 9Router
+
+Once your proxy is running and `test-connection.sh` passes, connect it to 9Router in 4 steps.
 
 ### Step 1 — Open 9Router Dashboard
 
-In your browser, navigate to:
-```
-http://localhost:20128/dashboard
-```
-(Replace `localhost` with your 9Router host IP if running remotely.)
-
-Log in with your 9Router password.
+Go to `http://localhost:20128/dashboard` in your browser and log in.
 
 ### Step 2 — Add the Proxy Pool
 
-1. In the sidebar, click **Proxy Pools** (or visit `http://localhost:20128/dashboard/proxy-pools`)
-2. Click **Add Proxy Pool**
-3. Select type: **Standard HTTP/HTTPS Proxy**
-4. Fill in the form:
+1. Open **Proxy Pools** page (URL: `http://localhost:20128/dashboard/proxy-pools`)
+2. Click **Add Proxy Pool** → choose **Standard HTTP/HTTPS Proxy**
+3. Fill the form:
 
    | Field | Value |
    |---|---|
-   | **Name** | `squid-local` (or any name you like) |
+   | **Name** | `squid-local` |
    | **Proxy URL** | `http://USERNAME:PASSWORD@HOST:PORT` |
    | **Type** | Standard |
-   | **Strict Proxy** | OFF (recommended — see note below) |
+   | **Strict Proxy** | OFF (recommended) |
 
-   Replace `USERNAME:PASSWORD@HOST:PORT` with the values from your `.env` file. Example:
+   Example with values from `.env`:
    ```
    http://opencode:Kx7mP2vQrT9wZ4aB@127.0.0.1:3128
    ```
 
-5. Click **Save**
-6. Verify the pool appears in the list with status **Active**
+4. Click **Save**, then click **Test** → expect `HTTP 200`
 
-### Step 3 — Test the Pool
+### Step 3 — Bind to OpenCode Free
 
-1. In the Proxy Pools list, find `squid-local`
-2. Click **Test** (or the play/speedometer icon)
-3. Expected result: `HTTP 200` with low latency (~70ms)
+1. Open **Providers → OpenCode Free** (URL: `http://localhost:20128/dashboard/providers/opencode`)
+2. Scroll to **Proxy Pool** dropdown (under "No authentication required" section)
+3. Select `squid-local` → click **Save**
 
-If test fails, check:
-- Is the Squid container running? `docker ps | grep squid`
-- Are credentials in URL exactly matching `.env`?
-- Is the port correct? (default 3128)
-
-### Step 4 — Bind to OpenCode Free
-
-1. Navigate to **Providers → OpenCode Free** (URL: `http://localhost:20128/dashboard/providers/opencode`)
-2. Find the **Proxy Pool** dropdown (under "No authentication required" section)
-3. Select `squid-local` from the dropdown
-4. Click **Save**
-
-That's it! All OpenCode Free requests will now route through your Squid proxy.
-
-### Step 5 — Verify End-to-End
+### Step 4 — Verify
 
 Send a test request through 9Router:
 
 ```bash
-# Replace YOUR_9ROUTER_API_KEY with your dashboard API key
 curl -X POST http://localhost:20128/v1/chat/completions \
   -H "Authorization: Bearer YOUR_9ROUTER_API_KEY" \
   -H "Content-Type: application/json" \
@@ -135,67 +120,41 @@ curl -X POST http://localhost:20128/v1/chat/completions \
   }'
 ```
 
-Expected response: HTTP 200 with model reply.
+Expect: HTTP 200 + model reply containing "OK". Done!
 
-### Verification via tcpdump (optional but definitive)
-
-To confirm traffic really goes through Squid:
-
-```bash
-# In another terminal, start capture
-sudo tcpdump -i lo -n 'port 3128'
-
-# Then send a request (in different terminal)
-curl -X POST http://localhost:20128/v1/chat/completions ...
-
-# You should see TCP packets to 127.0.0.1:3128
-```
-
-### About `Strict Proxy` Option
-
-- **OFF (recommended):** If Squid goes down, 9Router falls back to direct connection. Your coding session continues uninterrupted.
-- **ON:** If Squid goes down, requests fail. Use only when you absolutely require all traffic through proxy.
-
-For most users, keep **Strict Proxy = OFF** and rely on the auto-recovery monitor to restart Squid on failure.
+> **Strict Proxy** (in Step 2): keep OFF. If Squid goes down, 9Router falls back to direct connection so your work continues. The auto-recovery monitor (below) restarts Squid automatically.
 
 ---
 
-## Configuration (`.env`)
+## Auto-Recovery (Recommended)
 
-All settings live in `squid-proxy/.env`. Copy `.env.example` and fill in your values:
-
-| Variable | What it does | Example | Notes |
-|---|---|---|---|
-| `SQUID_USERNAME` | Login username for the proxy | `opencode` | Pick anything you like |
-| `SQUID_PASSWORD` | Login password for the proxy | (random) | Generate with: `openssl rand -base64 18 \| tr -d '/+='` |
-| `SQUID_HOST` | Network interface to bind | `127.0.0.1` | Use `127.0.0.1` for local-only, `0.0.0.0` to expose (risky!) |
-| `SQUID_PORT` | TCP port | `3128` | Standard Squid port. Change only if conflict |
-| `HEALTH_CHECK_URL` | URL monitor uses to test proxy | `https://httpbin.org/ip` | Any HTTPS URL returning 200 |
-
-### Example filled `.env`
+Install the monitor cron so the proxy self-heals on crash:
 
 ```bash
-SQUID_USERNAME=opencode
-SQUID_PASSWORD=Kx7mP2vQrT9wZ4aB
-SQUID_HOST=127.0.0.1
-SQUID_PORT=3128
-HEALTH_CHECK_URL=https://httpbin.org/ip
+crontab -e
+# Add this line (adjust the path):
+*/2 * * * * /path/to/9router-proxypool/squid-proxy/monitor-squid.sh >> /var/log/squid-monitor.log 2>&1
 ```
 
-> **Beginner tip:** Start with the example values above (but use your own password!). The defaults work for 99% of single-machine setups.
+The monitor runs every 2 minutes and:
+- Restarts the Squid container if it crashes or disappears
+- Restarts 9Router service if down
+- Verifies the proxy binding still exists
+
+Logs go to `/var/log/squid-monitor.log`.
 
 ---
 
-## Files
+## Architecture
 
 ```
-squid-proxy/
-├── .env                  # your credentials (chmod 600, gitignored)
-├── .env.example          # template with explanations
-├── docker-compose.yml    # compose config (uses ${VAR} from .env)
-├── squid.conf            # anonymous hardened config
-├── monitor-squid.sh      # auto-recovery cron (runs every 2 min)
-└── test-connection.sh    # sanity check script
+Your AI Tool (Claude Code, Cursor, etc.)
+    ↓ sends request to 9Router
+9Router (localhost:20128)
+    ↓ looks up OpenCode Free → sees Squid proxy binding
+Squid Container (Docker, port 3128)
+    ↓ forwards request anonymously (no headers leaked)
+opencode.ai (sees your server IP, not 9Router's internals)
 ```
 
 ---
@@ -205,83 +164,62 @@ squid-proxy/
 ```bash
 cd squid-proxy
 
-# Status
+# Check status
 docker compose ps
 docker logs squid-proxy --tail 50 -f
 
-# Restart
+# Restart (after editing .env or squid.conf)
 docker compose restart
 
 # Stop / Start
 docker compose down
 docker compose up -d
 
-# Edit config
-nano .env            # change credentials
-nano squid.conf      # change proxy behavior
-docker compose up -d # apply changes
+# Test the proxy
+./test-connection.sh
 
 # Manual monitor check
 ./monitor-squid.sh
-
-# Test proxy works
-./test-connection.sh
 ```
 
-### Auto-Recovery (Cron)
+### Files in this project
 
-Install the monitor cron to auto-restart on failure:
-
-```bash
-crontab -e
-# Add this line:
-*/2 * * * * /path/to/9router-proxypool/squid-proxy/monitor-squid.sh >> /var/log/squid-monitor.log 2>&1
 ```
-
-The monitor checks every 2 minutes:
-1. Container running
-2. Health status
-3. Proxy responds with HTTP 200
-4. 9Router binding intact
-5. 9Router service active
-
-If any check fails, it auto-recovers.
+squid-proxy/
+├── .env                  # your credentials (chmod 600, gitignored)
+├── .env.example          # template with explanations
+├── docker-compose.yml    # compose config (uses ${VAR} from .env)
+├── squid.conf            # anonymous hardened config
+├── monitor-squid.sh      # auto-recovery cron
+└── test-connection.sh    # sanity check script
+```
 
 ---
 
 ## Hardening Details
 
-This setup includes security hardening beyond the base `yegor256/squid-proxy` image:
-
-### Anonymous Headers (Stripped)
+Beyond the base `yegor256/squid-proxy` image, this setup strips all identifying headers:
 
 | Header | Default Squid | This Setup |
 |---|---|---|
-| `Via` (success) | leaked | stripped ✓ |
-| `Via` (error 407) | leaked | stripped ✓ |
+| `Via` (success & error) | leaked | stripped ✓ |
 | `X-Squid-Error` | leaked | stripped ✓ |
 | `X-Cache`, `Cache-Status` | leaked | stripped ✓ |
 | `X-Forwarded-For` | leaked | stripped ✓ |
 | Squid version | exposed | hidden ✓ |
 
-Implemented in `squid.conf` via:
-- `via off`
-- `httpd_suppress_version_string on`
-- `visible_hostname proxy`
-- `reply_header_access` rules for all leak-prone headers
+Implemented in `squid.conf` via `via off`, `httpd_suppress_version_string on`, and `reply_header_access` rules.
 
-### Authentication Required
-
-All proxy requests require HTTP Basic Auth. Wrong credentials → 407 Proxy Authentication Required.
+**Authentication is required** — all requests need HTTP Basic Auth or get 407.
 
 ---
 
 ## Test Results (10/10 PASSED)
 
-| Test | Status |
+| Test | Result |
 |---|---|
 | Functional chat request | ✅ HTTP 200 |
-| Network tcpdump (proxy used) | ✅ Verified |
+| Network capture (proxy used) | ✅ Verified |
 | Performance overhead | ✅ ~70ms |
 | 5 parallel requests | ✅ All 200, CPU 0.01% |
 | Auth (407 on bad creds) | ✅ Verified |
@@ -293,21 +231,28 @@ All proxy requests require HTTP Basic Auth. Wrong credentials → 407 Proxy Auth
 
 ---
 
+## Troubleshooting
+
+| Symptom | Likely Cause | Fix |
+|---|---|---|
+| `test-connection.sh` returns FAIL | Squid container not running | `docker compose up -d` |
+| 9Router "Connection not found" | Wrong URL format | Verify `http://user:pass@host:port` exactly matches `.env` |
+| HTTP 407 in dashboard test | Wrong credentials | Re-copy username/password from `.env` |
+| `address already in use` | Port 3128 occupied | Change `SQUID_PORT` in `.env` |
+| Cannot connect remotely | `SQUID_HOST` is 127.0.0.1 | Change to `0.0.0.0` (and ensure auth is strong!) |
+
+---
+
 ## Contributing
 
-Contributions are welcome! This is an open educational project — feel free to:
+Contributions welcome — fork, open issues, submit PRs.
 
-1. **Fork** the repository
-2. **Open issues** for bugs, suggestions, or improvements
-3. **Submit pull requests** for new features or fixes
-
-### Areas we'd love help with:
-- Additional relay provider configurations (Vercel, Deno Deploy, Cloudflare Workers)
+**Areas we'd love help with:**
+- Additional relay providers (Vercel, Deno Deploy, Cloudflare Workers)
 - Multi-IP rotation patterns
-- Improved monitoring / alerting
 - Documentation translations
 
-Before contributing, please read the existing files and ensure your changes are tested end-to-end.
+Before contributing, please test your changes end-to-end.
 
 ---
 
