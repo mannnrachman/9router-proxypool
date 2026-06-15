@@ -77,7 +77,7 @@ opencode.ai
 
 ## Built On
 
-- [caomingjun/warp-docker](https://github.com/cmj2002/warp-docker) — Cloudflare WARP client in Docker
+- [ErcinDedeoglu/cloudflare-warp](https://github.com/ErcinDedeoglu/cloudflare-warp) — Cloudflare WARP client in Docker with multi-instance IP rotation
 - [yegor256/squid-proxy](https://github.com/yegor256/squid-proxy) — anonymous Squid + HTTP Basic auth
 - [decolua/9router](https://github.com/decolua/9router) — the AI gateway this proxy integrates with
 
@@ -88,9 +88,11 @@ opencode.ai
 Contributions welcome — fork, open issues, submit PRs.
 
 **Areas we'd love help with:**
-- Additional relay providers (Vercel, Deno Deploy, Cloudflare Workers)
-- Multi-IP rotation patterns
+- Cloudflare Workers relay provider (best fit for AI API proxy — zero cold start, native outbound TCP, cheapest at scale)
+- Deno Deploy relay provider
 - Documentation translations
+
+> **Note on Vercel:** Not recommended for relay use case — 30x costlier than Cloudflare Workers at volume, higher cold starts, no native outbound TCP on Edge runtime.
 
 Before contributing, please test your changes end-to-end.
 
