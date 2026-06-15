@@ -53,9 +53,110 @@ docker compose up -d
 ./test-connection.sh
 ```
 
-Then bind the proxy in your 9Router dashboard:
-- **URL:** `http://USERNAME:PASSWORD@HOST:PORT` (use the values you set in `.env`)
-- **Type:** Standard HTTP proxy
+After the proxy is running, follow **[Setup in 9Router Dashboard](#setup-in-9router-dashboard)** below to bind it to OpenCode Free.
+
+---
+
+## Setup in 9Router Dashboard
+
+This section walks through connecting your Squid proxy to 9Router step by step.
+
+### Prerequisites
+
+- 9Router running (default: `http://localhost:20128`)
+- Squid proxy running (from Quick Start above)
+- `./test-connection.sh` returns `[PASS]`
+
+### Step 1 — Open 9Router Dashboard
+
+In your browser, navigate to:
+```
+http://localhost:20128/dashboard
+```
+(Replace `localhost` with your 9Router host IP if running remotely.)
+
+Log in with your 9Router password.
+
+### Step 2 — Add the Proxy Pool
+
+1. In the sidebar, click **Proxy Pools** (or visit `http://localhost:20128/dashboard/proxy-pools`)
+2. Click **Add Proxy Pool**
+3. Select type: **Standard HTTP/HTTPS Proxy**
+4. Fill in the form:
+
+   | Field | Value |
+   |---|---|
+   | **Name** | `squid-local` (or any name you like) |
+   | **Proxy URL** | `http://USERNAME:PASSWORD@HOST:PORT` |
+   | **Type** | Standard |
+   | **Strict Proxy** | OFF (recommended — see note below) |
+
+   Replace `USERNAME:PASSWORD@HOST:PORT` with the values from your `.env` file. Example:
+   ```
+   http://opencode:Kx7mP2vQrT9wZ4aB@127.0.0.1:3128
+   ```
+
+5. Click **Save**
+6. Verify the pool appears in the list with status **Active**
+
+### Step 3 — Test the Pool
+
+1. In the Proxy Pools list, find `squid-local`
+2. Click **Test** (or the play/speedometer icon)
+3. Expected result: `HTTP 200` with low latency (~70ms)
+
+If test fails, check:
+- Is the Squid container running? `docker ps | grep squid`
+- Are credentials in URL exactly matching `.env`?
+- Is the port correct? (default 3128)
+
+### Step 4 — Bind to OpenCode Free
+
+1. Navigate to **Providers → OpenCode Free** (URL: `http://localhost:20128/dashboard/providers/opencode`)
+2. Find the **Proxy Pool** dropdown (under "No authentication required" section)
+3. Select `squid-local` from the dropdown
+4. Click **Save**
+
+That's it! All OpenCode Free requests will now route through your Squid proxy.
+
+### Step 5 — Verify End-to-End
+
+Send a test request through 9Router:
+
+```bash
+# Replace YOUR_9ROUTER_API_KEY with your dashboard API key
+curl -X POST http://localhost:20128/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_9ROUTER_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "oc/deepseek-v4-flash-free",
+    "messages": [{"role": "user", "content": "reply OK"}],
+    "stream": false
+  }'
+```
+
+Expected response: HTTP 200 with model reply.
+
+### Verification via tcpdump (optional but definitive)
+
+To confirm traffic really goes through Squid:
+
+```bash
+# In another terminal, start capture
+sudo tcpdump -i lo -n 'port 3128'
+
+# Then send a request (in different terminal)
+curl -X POST http://localhost:20128/v1/chat/completions ...
+
+# You should see TCP packets to 127.0.0.1:3128
+```
+
+### About `Strict Proxy` Option
+
+- **OFF (recommended):** If Squid goes down, 9Router falls back to direct connection. Your coding session continues uninterrupted.
+- **ON:** If Squid goes down, requests fail. Use only when you absolutely require all traffic through proxy.
+
+For most users, keep **Strict Proxy = OFF** and rely on the auto-recovery monitor to restart Squid on failure.
 
 ---
 
