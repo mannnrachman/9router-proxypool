@@ -124,6 +124,41 @@ Expect: HTTP 200 + model reply containing "OK". Done!
 
 > **Strict Proxy** (in Step 2): keep OFF. If Squid goes down, 9Router falls back to direct connection so your work continues. The auto-recovery monitor (below) restarts Squid automatically.
 
+### Alternative: Setup via 9Router API
+
+If you prefer scripting over dashboard clicks (or want to automate deployment), the same steps can be done via the 9Router REST API:
+
+```bash
+# 1. Login to get JWT cookie
+curl -s -c /tmp/9r-cookies.txt -X POST http://localhost:20128/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"password":"YOUR_9ROUTER_PASSWORD"}'
+
+# 2. Create the proxy pool
+POOL_ID=$(curl -s -b /tmp/9r-cookies.txt -X POST http://localhost:20128/api/proxy-pools \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "squid-local",
+    "type": "standard",
+    "proxyUrl": "http://opencode:PASSWORD@127.0.0.1:3128",
+    "isActive": true
+  }' | python3 -c "import json,sys; print(json.load(sys.stdin)['proxyPool']['id'])")
+echo "Created pool: $POOL_ID"
+
+# 3. Test the pool
+curl -s -b /tmp/9r-cookies.txt -X POST \
+  "http://localhost:20128/api/proxy-pools/${POOL_ID}/test"
+
+# 4. Bind to OpenCode Free (providerStrategies)
+curl -s -b /tmp/9r-cookies.txt -X PATCH http://localhost:20128/api/settings \
+  -H "Content-Type: application/json" \
+  -d "{\"providerStrategies\":{\"opencode\":{\"proxyPoolId\":\"${POOL_ID}\"}}}"
+```
+
+Replace `YOUR_9ROUTER_PASSWORD` and the proxy URL credentials with your actual values.
+
+Both methods (Dashboard UI and API) produce the same result. Use whichever fits your workflow.
+
 ---
 
 ## Auto-Recovery (Recommended)
