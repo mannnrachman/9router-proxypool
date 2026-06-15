@@ -1,0 +1,18 @@
+services:
+  squid:
+    image: yegor256/squid-proxy:latest
+    container_name: squid-proxy
+    restart: unless-stopped
+    ports:
+      - "${SQUID_HOST:-127.0.0.1}:${SQUID_PORT:-3128}:3128"
+    environment:
+      - USERNAME=${SQUID_USERNAME}
+      - PASSWORD=${SQUID_PASSWORD}
+    volumes:
+      - ./squid.conf:/etc/squid/squid.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "squid -k check || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
