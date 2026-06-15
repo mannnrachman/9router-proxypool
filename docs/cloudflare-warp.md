@@ -1,8 +1,10 @@
 # Cloudflare WARP Proxy
 
-SOCKS5 proxy using [Cloudflare WARP](https://developers.cloudflare.com/warp-client/) — **changes your visible IP** to Cloudflare's network. Recommended when you want OpenCode Free to see a Cloudflare IP instead of your server's IP.
+SOCKS5 proxy using [Cloudflare WARP](https://developers.cloudflare.com/warp-client/) with **IP rotation** — routes OpenCode Free traffic through Cloudflare's network with multiple rotating IPs.
 
-> **Why WARP over Squid?** Squid only strips headers — your server IP is still visible. WARP actually routes traffic through Cloudflare, so opencode.ai sees a Cloudflare IP (e.g., `104.x.x.x`), not your real server IP.
+Built on [dublok/cloudflare-warp](https://hub.docker.com/r/dublok/cloudflare-warp) (upstream: [ErcinDedeoglu/cloudflare-warp](https://github.com/ErcinDedeoglu/cloudflare-warp)).
+
+> **Why WARP over Squid?** Squid only strips headers — your server IP is still visible. WARP routes traffic through Cloudflare, so opencode.ai sees a Cloudflare IP (e.g., `104.x.x.x`), not your real server IP. With multi-instance, each request exits through a different Cloudflare IP.
 
 ---
 
@@ -12,11 +14,19 @@ SOCKS5 proxy using [Cloudflare WARP](https://developers.cloudflare.com/warp-clie
 9Router (:20128)
     ↓ routes OpenCode Free → warp-local pool
 WARP Docker Container (:10800, SOCKS5 + auth)
-    ↓ encrypted tunnel
-Cloudflare Network (SG/datacenter, IP: 104.x.x.x)
+    ↓ GOST round-robin across N instances
+    ├─ Instance 1 (IP: 104.28.x.1)
+    ├─ Instance 2 (IP: 104.28.x.2)
+    ├─ Instance 3 (IP: 104.28.x.3)
+    ├─ Instance 4 (IP: 104.28.x.4)
+    └─ Instance 5 (IP: 104.28.x.5)
+    ↓ encrypted tunnel each
+Cloudflare Network (SG/datacenter)
     ↓
-opencode.ai (sees Cloudflare IP, not your server)
+opencode.ai (sees rotating Cloudflare IPs, not your server)
 ```
+
+**IP Rotation:** Each WARP instance gets a unique Cloudflare IP. GOST round-robins requests across all instances, so consecutive requests exit through different IPs. If an instance fails, GOST skips it after 3 failures and retries after 30s.
 
 **Key safety feature:** WARP runs **inside a Docker container** with isolated networking. It does **not** interfere with:
 - Your WireGuard SSH connection
@@ -60,6 +70,7 @@ When `test-warp.sh` shows `[PASS]`, proceed to **[Connect to 9Router](#connect-t
 |---|---|---|---|
 | `WARP_PROXY_USER` | SOCKS5 auth username | `opencode` | Required — rejects unauthenticated use |
 | `WARP_PROXY_PASS` | SOCKS5 auth password | (random) | Generate: `openssl rand -base64 18 \| tr -d '/+='` |
+| `WARP_INSTANCES` | Number of WARP instances | `5` | Each gets unique Cloudflare IP. RAM ~50-100MB per instance |
 | `WARP_LICENSE_KEY` | WARP+ license (optional) | `xxxx-xxxx-xxxx-xxxx` | Free tier works without it |
 | `WARP_HOST` | Host bind | `127.0.0.1` | Localhost only (secure) |
 | `WARP_PORT` | Host port | `10800` | Container internal port is 1080 |
@@ -67,7 +78,21 @@ When `test-warp.sh` shows `[PASS]`, proceed to **[Connect to 9Router](#connect-t
 **Security defaults:**
 - Binds to `127.0.0.1` (localhost only — not exposed to internet)
 - Requires SOCKS5 authentication (no open proxy)
+- Rate limit disabled (`PROXY_MAX_CONN=0`, `PROXY_MAX_RPS=0`) — safe since 9Router is on localhost
 - WireGuard/SSH on host unaffected
+
+### Tuning IP Rotation
+
+Edit `WARP_INSTANCES` in `.env`:
+
+| Value | RAM | Use case |
+|---|---|---|
+| `1` | ~100MB | No rotation (single IP) |
+| `3` | ~300MB | Light rotation |
+| `5` | ~500MB | **Default** — good balance |
+| `10` | ~1GB | Heavy rotation, high traffic |
+
+After changing: `docker compose down && docker compose up -d`
 
 ---
 
@@ -134,6 +159,18 @@ curl -X POST http://10.0.0.1:20128/v1/chat/completions \
 
 Expect: HTTP 200 + reply containing "OK".
 
+### Verify IP Rotation
+
+```bash
+# Send 10 requests, see different Cloudflare IPs
+for i in {1..10}; do
+  curl -s --proxy socks5://opencode:PASSWORD@127.0.0.1:10800 https://ifconfig.me
+  echo ""
+done
+```
+
+You should see 2-5 different `104.x.x.x` IPs (depending on `WARP_INSTANCES`).
+
 ---
 
 ## Day-to-Day Commands
@@ -171,9 +208,12 @@ warp-proxy/
 |---|---|---|
 | `test-warp.sh` shows FAIL | Container not running | `docker compose up -d` |
 | `warp=off` in test | WARP daemon not connected | `docker compose restart`, wait 10s |
+| All requests same IP | Instances still warming up | Wait 30s, re-run test |
+| Fewer unique IPs than instances | Some instances still connecting | Normal during startup; re-check after 1 min |
 | "User was rejected" | Wrong credentials | Re-check `WARP_PROXY_USER`/`PASS` in `.env` |
 | `address already in use` | Port 10800 occupied | Change `WARP_PORT` in `.env` |
 | 9Router test fails | Wrong URL or 9Router can't reach localhost | Verify 9Router binds to `10.0.0.1` and proxy is `127.0.0.1:10800` |
+| High RAM usage | Too many instances | Reduce `WARP_INSTANCES` in `.env` |
 
 ---
 

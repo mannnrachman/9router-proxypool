@@ -6,7 +6,7 @@ Self-hosted proxy pools for [9Router](https://github.com/decolua/9router) — ro
 
 | Option | What it does | Best for |
 |---|---|---|
-| **[Cloudflare WARP](./docs/cloudflare-warp.md)** ⭐ | SOCKS5 proxy that **changes your visible IP** to Cloudflare's network | Hiding your real server IP from opencode.ai |
+| **[Cloudflare WARP](./docs/cloudflare-warp.md)** ⭐ | SOCKS5 proxy with **IP rotation** — routes through Cloudflare's network with multiple rotating IPs | Hiding your real server IP + distribute traffic across IPs |
 | **[Squid Proxy](./docs/squid-proxy.md)** | Anonymous HTTP proxy that strips identifying headers (`Via`, `XFF`, etc.) + auth | Anonymity without IP change |
 
 > **New here?** Start with [Cloudflare WARP](./docs/cloudflare-warp.md) — it's the recommended option for most users.
