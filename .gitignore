@@ -6,7 +6,8 @@
 *.key
 *.pem
 
-# === Backups ===*.bak
+# === Backups ===
+*.bak
 *.backup
 *-backup-*
 backups/
