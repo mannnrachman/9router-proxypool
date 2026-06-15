@@ -1,0 +1,37 @@
+# === Secrets ===
+.env
+.env.local
+.env.*.local
+*.secret
+*.key
+*.pem
+
+# === Backups ===*.bak
+*.backup
+*-backup-*
+backups/
+
+# === Logs ===
+*.log
+logs/
+
+# === OS ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Editor ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.tmp
+
+# === Docker ===
+# (tidak ignore docker-compose.yml karena commit-safe pakai ${VAR})
+
+# === Runtime ===
+proxy-response.json
+*.sqlite
+*.sqlite-journal
